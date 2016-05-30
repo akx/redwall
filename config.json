@@ -1,0 +1,21 @@
+{
+  "subreddits": [
+    "imaginarylandscapes",
+    "imaginarycityscapes",
+    "wallpapers",
+    "AbandonedPorn",
+    "EarthPorn",
+    "CityPorn",
+    "EyeCandy",
+    "HousePorn",
+    "FoodPorn",
+    "remoteplaces",
+    "cozyplaces",
+    "ImaginaryWorlds"
+  ],
+  "settings": {
+    "minWidth": 1900,
+    "minHeight": 1000,
+    "landscapeOnly": true
+  }
+}

@@ -16,6 +16,7 @@
   "settings": {
     "minWidth": 1900,
     "minHeight": 1000,
-    "landscapeOnly": true
+    "minAspect": 1.1,
+    "maxAspect": 1.9
   }
 }

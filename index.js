@@ -6,14 +6,23 @@ const fs = Promise.promisifyAll(require('fs'));
 const R = require('ramda');
 const sample = require('lodash/sample');
 const jpeg = require('jpeg-js');
+const path = require('path');
 const slug = require('slug');
 const setOSXWallpaper = require('./set-osx-wallpaper');
 
+fetch.Promise = Promise;
+
+process.on("unhandledRejection", function (reason, promise) {
+  throw reason;
+});
+
 function verifyImageDimensions(options, width, height) {
-  const {minWidth, minHeight, landscapeOnly} = options;
+  const {minWidth, minHeight, minAspect, maxAspect} = options;
   if (minWidth && width < minWidth) return false;
   if (minHeight && height < minHeight) return false;
-  if (landscapeOnly && (width < height)) return false;
+  const aspect = minWidth / minHeight;
+  if (minAspect && aspect < minAspect) return false;
+  if (maxAspect && aspect > maxAspect) return false;
   return true;
 }
 
@@ -47,31 +56,51 @@ function fetchToFile(url, localPath) {
     const fileStream = fs.createWriteStream(localPath);
     resp.body.pipe(fileStream);
     return new Promise((resolve) => {
-      console.log(resp.body);
-      resp.body.on('end', () => resolve(fileStream));
+      fileStream.on('finish', () => {
+        resolve(localPath);
+      });
     });
   });
 }
 
 function downloadAndVerifyImage(image) {
-  console.log(`~ Downloading ${image.title} (${image.url})...`);
-  const tempName = `rw-${+new Date()}-${slug(image.title)}.jpg`;
-  return fetchToFile(image.url, tempName).then(() => {
-    return fs.readFileAsync(tempName).then((data) => {
+  const tempName = path.resolve(`./downloads/${slug(image.title)}.jpg`);
+  return fetchToFile(image.url, tempName)
+    .then((filename) => fs.readFileAsync(filename))
+    .then((data) => {
       const {width, height} = jpeg.decode(data);
+      console.log(tempName, width, height);
       if (!verifyImageDimensions(config.settings, width, height)) {
         throw new Error(`dimensions of image ${image.title} (${width}x${height}) are not accepted`);
       }
       return tempName;
-    })
+    });
+}
+
+function pickDownloadAndSetWallpaper(config) {
+  const subreddit = sample(config.subreddits);
+  return getImages(subreddit, config.settings).then((images) => {
+    const image = sample(images);
+    console.log(`* subreddit: ${subreddit}`);
+    console.log(`* title:     ${image.title}`);
+    console.log(`* url:       ${image.url}`);
+    return downloadAndVerifyImage(image);
+  }).then((localPath) => {
+    console.log(`Setting wallpaper to ${localPath}`);
+    return setOSXWallpaper(localPath);
   });
 }
 
-const subreddit = sample(config.subreddits);
+function go() {
+  return pickDownloadAndSetWallpaper(config).then(
+    () => {
+    },
+    (err) => {
+      console.log(err);
+      console.log('oops, rejected. trying another.');
+      return go();
+    }
+  );
+}
 
-getImages(subreddit, config.settings).then((images) => {
-  const image = sample(images);
-  return downloadAndVerifyImage(image);
-}).then((localPath) => {
-  setOSXWallpaper(localPath);
-});
+go();

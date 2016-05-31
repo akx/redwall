@@ -1,23 +1,23 @@
 const Promise = require('bluebird');
+
 const cache = require('./cache');
 const config = require('./config');
-const fetch = require('node-fetch');
 const fs = Promise.promisifyAll(require('fs'));
-const R = require('ramda');
-const sample = require('lodash/sample');
 const jpeg = require('jpeg-js');
 const path = require('path');
+const R = require('ramda');
+const rp = require('request-promise');
+const prettySize = require('prettysize');
+const sample = require('lodash/sample');
 const slug = require('slug');
 const setOSXWallpaper = require('./set-osx-wallpaper');
 
-fetch.Promise = Promise;
-
-process.on("unhandledRejection", function (reason, promise) {
+process.on("unhandledRejection", (reason) => {
   throw reason;
 });
 
 function verifyImageDimensions(options, width, height) {
-  const {minWidth, minHeight, minAspect, maxAspect} = options;
+  const {minWidth, minHeight, minAspect, maxAspect,} = options;
   if (minWidth && width < minWidth) return false;
   if (minHeight && height < minHeight) return false;
   const aspect = minWidth / minHeight;
@@ -32,7 +32,10 @@ function getImages(subreddit, options = {}) {
     subreddit,
     (() => {
       console.log(`+ Downloading ${subreddit}...`);
-      return fetch(`https://reddit.com/r/${subreddit}.json`).then((r) => r.json());
+      return rp({
+        uri: `https://reddit.com/r/${subreddit}.json`,
+        json: true,
+      });
     }),
     60 * 60 * 5
   ).then(R.pipe(
@@ -51,29 +54,46 @@ function getImages(subreddit, options = {}) {
   ));
 }
 
-function fetchToFile(url, localPath) {
-  return fetch(url).then((resp) => {
-    const fileStream = fs.createWriteStream(localPath);
-    resp.body.pipe(fileStream);
-    return new Promise((resolve) => {
-      fileStream.on('finish', () => {
-        resolve(localPath);
-      });
-    });
+function downloadToLocalFile(uri, localPath, respCallback = R.identity) {
+  const req = rp({
+    uri,
+    encoding: null,
   });
+  req.on('response', respCallback);
+  return req.then((body) => fs.writeFileAsync(localPath, body)).then(() => localPath);
 }
 
 function downloadAndVerifyImage(image) {
-  const tempName = path.resolve(`./downloads/${slug(image.title)}.jpg`);
-  return fetchToFile(image.url, tempName)
+  console.log(`* subreddit:   ${image.subreddit}`);
+  console.log(`* title:       ${image.title}`);
+  console.log(`* url:         ${image.url}`);
+  const localPath = path.resolve(`./downloads/${slug(image.title)}.jpg`);
+  try {
+    if (fs.accessSync(localPath, fs.F_OK)) {  // Pre-existing file
+
+      console.log(`* found:    ${localPath}`);
+      return localPath;
+    }
+  } catch (e) {
+    // didn't exist, okay
+  }
+  return downloadToLocalFile(image.url, localPath, (resp) => {
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      return;
+    }
+    const size = parseInt(resp.headers['content-length']);
+    if (size) {
+      console.log(`* size:        ${prettySize(size)}`);
+    }
+  })
     .then((filename) => fs.readFileAsync(filename))
     .then((data) => {
-      const {width, height} = jpeg.decode(data);
-      console.log(tempName, width, height);
+      console.log(`* downloaded:  ${localPath}`);
+      const {width, height,} = jpeg.decode(data);
       if (!verifyImageDimensions(config.settings, width, height)) {
-        throw new Error(`dimensions of image ${image.title} (${width}x${height}) are not accepted`);
+        throw new Error(`dimensions of image ${image.title} (${width}×${height}) are not accepted`);
       }
-      return tempName;
+      return localPath;
     });
 }
 
@@ -81,9 +101,7 @@ function pickDownloadAndSetWallpaper(config) {
   const subreddit = sample(config.subreddits);
   return getImages(subreddit, config.settings).then((images) => {
     const image = sample(images);
-    console.log(`* subreddit: ${subreddit}`);
-    console.log(`* title:     ${image.title}`);
-    console.log(`* url:       ${image.url}`);
+    image.subreddit = subreddit;
     return downloadAndVerifyImage(image);
   }).then((localPath) => {
     console.log(`Setting wallpaper to ${localPath}`);

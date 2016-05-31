@@ -49,10 +49,10 @@ const put = (key, value, ttl = 60) => {
 module.exports.cached = (key, getter, expiry = 60, validator = R.identity) => (
   get(key).then((cachedVal) => {
     if (validator(cachedVal)) {
-      return R.merge({$cache: true}, cachedVal);
+      return R.merge({$cache: true,}, cachedVal);
     }
     return getter(key).then((newVal) => {
-      put(key, R.merge({$mtime: +new Date()}, newVal), expiry);
+      put(key, R.merge({$mtime: +new Date(),}, newVal), expiry);
       return newVal;
     });
   })

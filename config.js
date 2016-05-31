@@ -1,0 +1,28 @@
+module.exports = {
+  'subreddits': [
+    'AbandonedPorn',
+    'ArchitecturePorn',
+    'BonsaiPorn',
+    'CityPorn',
+    'cozyplaces',
+    'EarthPorn',
+    'EyeCandy',
+    'FoodPorn',
+    'HousePorn',
+    'imaginarycityscapes',
+    'ImaginaryColorscapes',
+    'imaginarylandscapes',
+    'ImaginaryWorlds',
+    'remoteplaces',
+    'RoomPorn',
+    'VillagePorn',
+    'wallpapers',
+    'WeatherPorn',
+  ],
+  'settings': {
+    'minWidth': 1900,
+    'minHeight': 1000,
+    'minAspect': 1.1,
+    'maxAspect': 1.9,
+  },
+};

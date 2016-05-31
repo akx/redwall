@@ -1,7 +1,7 @@
 const main = require('./lib/main');
 const config = require('./config');
 
-process.on("unhandledRejection", (reason) => {
+process.on('unhandledRejection', (reason) => {
   throw reason;
 });
 

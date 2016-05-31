@@ -5,7 +5,7 @@ module.exports = {
   },
   "extends": "eslint:recommended",
   "rules": {
-    "comma-dangle": ["error", "always"],
+    "comma-dangle": ["error", "always-multiline"],
     "no-console": ["off"],
     "prefer-arrow-callback": ["warn"],
   }
